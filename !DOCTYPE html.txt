@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>文物叙事者 · AI多模态文化遗产活化平台</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind + React + Framer Motion CDNs -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@11.11.17/dist/framer-motion.js"></script>
+    <script>window.Motion = window.FramerMotion;</script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; overflow-x: hidden; font-family: 'Barlow', sans-serif; }
+        /* 自定义圆角全局: 默认rounded变成pill */
+        .rounded { border-radius: 9999px; }
+        /* 液态玻璃效果 (完全按照要求) */
+        .liquid-glass {
+            background: rgba(255,255,255,0.01);
+            background-blend-mode: luminosity;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border: none;
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .liquid-glass::before {
+            content: "";
+            position: absolute; inset: 0;
+            border-radius: inherit;
+            padding: 1.4px;
+            background: linear-gradient(180deg,
+                rgba(255,255,255,0.45) 0%,
+                rgba(255,255,255,0.15) 20%,
+                rgba(255,255,255,0) 40%,
+                rgba(255,255,255,0) 60%,
+                rgba(255,255,255,0.15) 80%,
+                rgba(255,255,255,0.45) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+        .liquid-glass-strong {
+            backdrop-filter: blur(50px);
+            box-shadow: 4px 4px 4px rgba(0,0,0,0.05), inset 0 1px 1px rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.01);
+            background-blend-mode: luminosity;
+            position: relative;
+            overflow: hidden;
+        }
+        .liquid-glass-strong::before {
+            content: "";
+            position: absolute; inset: 0;
+            border-radius: inherit;
+            padding: 1.4px;
+            background: linear-gradient(180deg,
+                rgba(255,255,255,0.5) 0%,
+                rgba(255,255,255,0.2) 20%,
+                rgba(255,255,255,0) 40%,
+                rgba(255,255,255,0) 60%,
+                rgba(255,255,255,0.2) 80%,
+                rgba(255,255,255,0.5) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+        /* 自定义滚动条好看点 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 999px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        /* 文物纹样底纹辅助 */
+        .pattern-bg {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(255,215,0,0.03)' stroke-width='0.5'%3E%3Cpath d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/%3E%3C/svg%3E");
+            background-repeat: repeat;
+            background-size: 32px;
+        }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+    const { motion, AnimatePresence } = window.Motion;
+    const { useState, useEffect, useRef, useCallback } = React;
+    // ---------- 全局工具：BlurText (逐字模糊动画) ----------
+    const BlurText = ({ text, className = "", delayBase = 0, once = true }) => {
+        const [hasAnimated, setHasAnimated] = useState(false);
+        const ref = useRef(null);
+        useEffect(() => {
+            const observer = new IntersectionObserver(([entry]) => {
+                if (entry.isIntersecting && !hasAnimated) {
+                    setHasAnimated(true);
+                    observer.disconnect();
+                }
+            }, { threshold: 0.1 });
+            if (ref.current) observer.observe(ref.current);
+            return () => observer.disconnect();
+        }, [hasAnimated]);
+        const words = text.split(' ');
+        return (
+            <p ref={ref} className={`flex flex-wrap justify-center gap-x-[0.28em] ${className}`}>
+                {words.map((word, i) => (
+                    <motion.span
+                        key={i}
+                        initial={hasAnimated ? false : { filter: 'blur(10px)', opacity: 0, y: 50 }}
+                        animate={hasAnimated ? { filter: 'blur(0px)', opacity: 1, y: 0 } : {}}
+                        transition={{
+                            duration: 0.7,
+                            delay: delayBase + (i * 0.1),
+                            ease: "easeOut",
+                            times: [0, 0.5, 1],
+                            keyframes: hasAnimated ? undefined : [
+                                { filter: 'blur(10px)', opacity: 0, y: 50 },
+                                { filter: 'blur(5px)', opacity: 0.5, y: -5 },
+                                { filter: 'blur(0px)', opacity: 1, y: 0 }
+                            ]
+                        }}
+                        style={{ display: 'inline-block', marginRight: '0.28em' }}
+                    >
+                        {word}
+                    </motion.span>
+                ))}
+            </p>
+        );
+    };
+    // ---------- FadingVideo 组件 (纯requestAnimationFrame 交叉淡变，手动循环) ----------
+    const FadingVideo = ({ src, className, style = {}, scale120 = false, objectTop = false }) => {
+        const videoRef = useRef(null);
+        const rAFRef = useRef(null);
+        const fadingOutRef = useRef(false);
+        const currentOpacity = useRef(0);
+        const fadeTo = useCallback((targetOpacity, durationMs, callback) => {
+            if (rAFRef.current) cancelAnimationFrame(rAFRef.current);
+            const startOpacity = currentOpacity.current;
+            const delta = targetOpacity - startOpacity;
+            const startTime = performance.now();
+            const step = (now) => {
+                const elapsed = now - startTime;
+                let t = Math.min(1, elapsed / durationMs);
+                let newOpacity = startOpacity + delta * t;
+                if (videoRef.current) videoRef.current.style.opacity = newOpacity;
+                currentOpacity.current = newOpacity;
+                if (t < 1) rAFRef.current = requestAnimationFrame(step);
+                else {
+                    if (callback) callback();
+                    rAFRef.current = null;
+                }
+            };
+            rAFRef.current = requestAnimationFrame(step);
+        }, []);
+        useEffect(() => {
+            const video = videoRef.current;
+            if (!video) return;
+            const onLoaded = () => {
+                video.style.opacity = 0;
+                currentOpacity.current = 0;
+                video.play().catch(e=>console.log);
+                fadeTo(1, 500);
+            };
+            const onTimeUpdate = () => {
+                if (!fadingOutRef.current && video.duration - video.currentTime <= 0.55 && video.duration - video.currentTime > 0) {
+                    fadingOutRef.current = true;
+                    fadeTo(0, 500, () => {});
+                }
+            };
+            const onEnded = () => {
+                if (video) {
+                    video.style.opacity = 0;
+                    currentOpacity.current = 0;
+                    setTimeout(() => {
+                        video.currentTime = 0;
+                        video.play().catch(e=>console.log);
+                        fadingOutRef.current = false;
+                        fadeTo(1, 500);
+                    }, 100);
+                }
+            };
+            video.addEventListener('loadeddata', onLoaded);
+            video.addEventListener('timeupdate', onTimeUpdate);
+            video.addEventListener('ended', onEnded);
+            return () => {
+                video.removeEventListener('loadeddata', onLoaded);
+                video.removeEventListener('timeupdate', onTimeUpdate);
+                video.removeEventListener('ended', onEnded);
+                if (rAFRef.current) cancelAnimationFrame(rAFRef.current);
+            };
+        }, [fadeTo]);
+        const combinedClasses = `absolute ${objectTop ? 'top-0 left-1/2 -translate-x-1/2 object-top' : 'inset-0 w-full h-full object-cover'} ${className}`;
+        const videoStyle = scale120 ? { width: '120%', height: '120%', ...style } : style;
+        return <video ref={videoRef} src={src} autoPlay muted playsInline preload="auto" loop={false} className={combinedClasses} style={{ opacity: 0, ...videoStyle }} />;
+    };
+    // ---------- 启动页 (loading) ----------
+    const SplashScreen = ({ onFinish }) => {
+        const [progress, setProgress] = useState(0);
+        useEffect(() => {
+            const interval = setInterval(() => {
+                setProgress(p => { if(p >= 100) { clearInterval(interval); setTimeout(onFinish, 300); return 100; } return p+5; });
+            }, 50);
+            return () => clearInterval(interval);
+        }, []);
+        return (
+            <div className="fixed inset-0 z-[200] bg-gradient-to-br from-[#0a1f2e] via-[#0e2a2a] to-[#0a2e1f] pattern-bg flex flex-col items-center justify-center">
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.6 }} className="text-center">
+                    <h1 className="font-heading italic text-white text-6xl md:text-7xl tracking-tight">文物叙事者</h1>
+                    <p className="text-white/70 text-lg mt-2 font-body">Heritage Narrator</p>
+                    <p className="text-white/40 text-sm mt-4 italic">让每一件文物都会说话</p>
+                </motion.div>
+                <div className="w-64 mt-16 bg-white/20 rounded-full h-1 overflow-hidden">
+                    <div className="h-full bg-amber-400 rounded-full" style={{ width: `${progress}%` }}></div>
+                </div>
+                <p className="text-white/50 text-xs mt-4">正在唤醒文物精灵...</p>
+            </div>
+        );
+    };
+    // ========== 页面1: 首页 (主界面) ==========
+    const HomePage = ({ setCurrentPage, setSelectedArtifact }) => {
+        const banners = [
+            { title: "三星堆·青铜立人像——新故事上线", tag: "AI深度解读" },
+            { title: "乡村学校公益计划——1000所免费接入", tag: "公益行动" },
+            { title: "AR新体验——把文物请回家", tag: "沉浸科技" }
+        ];
+        const recommends = [
+            { name: "三星堆青铜面具", viewers: "2893人最近看过", desc: "商代，用于祭祀仪式，纵目夸张" },
+            { name: "东汉击鼓说唱陶俑", viewers: "1567人最近看过", desc: "汉代俳优，国家一级文物，神态诙谐" },
+            { name: "金沙太阳神鸟", viewers: "3421人最近看过", desc: "成都城市标志原型，金饰含太阳与神鸟" }
+        ];
+        return (
+            <div className="min-h-screen bg-black text-white pb-20">
+                {/* 顶部状态栏风格 */}
+                <div className="flex justify-between items-center px-5 pt-5">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-600 to-amber-800 flex items-center justify-center text-white font-bold">李</div>
+                        <span className="font-body font-medium">你好，李明</span>
+                    </div>
+                    <button className="liquid-glass rounded-full px-4 py-1.5 text-sm">签到 +1</button>
+                </div>
+                {/* 轮播banner简化 */}
+                <div className="mt-4 px-5 overflow-x-auto no-scrollbar flex gap-4">
+                    {banners.map((b,idx)=>(
+                        <div key={idx} className="min-w-[280px] bg-white/5 rounded-2xl p-4 backdrop-blur-sm border border-white/10">
+                            <p className="font-bold text-lg">{b.title}</p>
+                            <span className="text-xs text-amber-300">{b.tag}</span>
+                        </div>
+                    ))}
+                </div>
+                {/* 功能图标区 */}
+                <div className="grid grid-cols-4 gap-3 px-5 mt-8">
+                    {[
+                        { icon:"", label:"拍照识别", action:()=>setCurrentPage('scan') },
+                        { icon:"🥽", label:"文物到家", action:()=>setCurrentPage('ar') },
+                        { icon:"", label:"问问文物", action:()=>{ setSelectedArtifact({ name:'青铜立人像', era:'商代', museum:'三星堆', desc:'我是青铜立人，问我吧！' }); setCurrentPage('chat'); } },
+                        { icon:"⭐", label:"我的宝库", action:()=>setCurrentPage('collection') }
+                    ].map((f,i)=>(
+                        <button key={i} onClick={f.action} className="flex flex-col items-center gap-1">
+                            <div className="w-14 h-14 rounded-2xl liquid-glass flex items-center justify-center text-2xl">{f.icon}</div>
+                            <span className="text-xs">{f.label}</span>
+                        </button>
+                    ))}
+                </div>
+                {/* 猜你喜欢 */}
+                <div className="px-5 mt-8">
+                    <h3 className="font-heading italic text-2xl">猜你喜欢</h3>
+                    <div className="space-y-3 mt-3">
+                        {recommends.map((item,idx)=>(
+                            <div key={idx} className="bg-white/5 rounded-xl p-3 flex justify-between items-center">
+                                <div><p className="font-bold">{item.name}</p><p className="text-xs text-white/60">{item.viewers}</p><p className="text-xs mt-1">{item.desc}</p></div>
+                                <button className="liquid-glass px-3 py-1 text-xs rounded-full">详情</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                {/* 底部导航栏 */}
+                <div className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/10 py-2 flex justify-around">
+                    {['首页','发现','消息','我的'].map((tab,i)=><span key={i} className={`text-sm ${i===0?'text-amber-400':'text-white/60'}`}>{tab}</span>)}
+                </div>
+            </div>
+        );
+    };
+    // 扫描识别模拟界面
+    const ScanPage = ({ setCurrentPage, setSelectedArtifact }) => {
+        const [scanning, setScanning] = useState(true);
+        const handleSuccess = () => {
+            setScanning(false);
+            setSelectedArtifact({ name:'青铜立人像', era:'商代', museum:'三星堆博物馆', height:'260.8cm', material:'青铜', year:'1986年出土', level:'国家一级文物', story:'我是距今约3000多年的青铜立人像，出土于三星堆祭祀坑。关于我的身份，学界有多种说法：有人说是古蜀国的大祭司，也有人说是国王。你看我双手环握的姿势——曾经我手里握着什么呢？可能是象牙、金杖，或是某种法器。你想问我什么？点击【试试问我】' });
+        };
+        return (
+            <div className="min-h-screen bg-black relative">
+                <div className="absolute inset-0 bg-[url('https://picsum.photos/id/104/800/1200')] bg-cover opacity-20"></div>
+                <div className="relative z-10 p-5">
+                    <button onClick={()=>setCurrentPage('home')} className="text-white text-xl mb-4">← 返回</button>
+                    <div className="flex justify-center mt-20">
+                        <div className="w-72 h-72 rounded-full border-2 border-amber-400/80 shadow-[0_0_20px_rgba(255,215,0,0.5)] flex items-center justify-center animate-pulse">
+                            <div className="w-60 h-60 rounded-full border border-dashed border-white/40"></div>
+                        </div>
+                    </div>
+                    <p className="text-center text-white mt-8">将文物对准取景框</p>
+                    {scanning && <button onClick={handleSuccess} className="mx-auto block mt-10 liquid-glass-strong px-6 py-2 rounded-full">模拟识别成功</button>}
+                    {!scanning && (<div className="mt-8 bg-black/70 p-4 rounded-2xl text-center"><p className="text-green-400">识别成功！青铜立人像 · 相似度98%</p><div className="flex gap-4 justify-center mt-3"><button onClick={()=>{ setCurrentPage('detail'); }} className="bg-white/20 px-4 py-1 rounded-full">查看详情</button><button onClick={()=>{ setCurrentPage('chat'); }} className="bg-amber-600 px-4 py-1 rounded-full">和它对话</button></div></div>)}
+                </div>
+            </div>
+        );
+    };
+    // 文物详情页
+    const ArtifactDetail = ({ artifact, setCurrentPage }) => {
+        if(!artifact) artifact = { name:'青铜立人像', era:'商代', museum:'三星堆博物馆', height:'260.8cm', material:'青铜', year:'1986年出土', level:'国家一级文物', story:'我是距今约3000多年的青铜立人像...' };
+        return (
+            <div className="min-h-screen bg-black text-white pb-20">
+                <div className="relative h-64 bg-gradient-to-b from-amber-900/40 to-black flex items-center justify-center"><p className="text-4xl"> 文物图片</p></div>
+                <div className="px-5 -mt-6 relative z-10">
+                    <h1 className="text-3xl font-heading italic">{artifact.name} · {artifact.era}</h1>
+                    <p className="text-white/60 text-sm">{artifact.museum}</p>
+                    <div className="flex flex-wrap gap-3 my-4 bg-white/5 p-3 rounded-xl"><span> {artifact.height}</span><span>⚱️ {artifact.material}</span><span> {artifact.year}</span><span> {artifact.level}</span></div>
+                    <div className="flex gap-3 my-3"><button className="liquid-glass-strong px-4 py-2 rounded-full text-sm"> AI语音导览</button><button className="liquid-glass-strong px-4 py-2 rounded-full text-sm">🥽 AR体验</button><button className="liquid-glass-strong px-4 py-2 rounded-full text-sm" onClick={()=>setCurrentPage('chat')}> AI问答</button></div>
+                    <div className="bg-white/5 rounded-2xl p-4 mt-2"><p className="text-sm leading-relaxed">{artifact.story}</p><button onClick={()=>setCurrentPage('chat')} className="mt-3 text-amber-400 text-sm">试试问我 →</button></div>
+                </div>
+            </div>
+        );
+    };
+    // AI对话页面 (演示文物问答)
+    const ChatPage = ({ artifact, setCurrentPage }) => {
+        const [messages, setMessages] = useState([{ role:'assistant', content:'我是青铜立人，你从哪里来呀？' }]);
+        const [input, setInput] = useState('');
+        const sendMsg = (text) => {
+            if(!text.trim()) return;
+            const newMsgs = [...messages, { role:'user', content:text }];
+            setMessages(newMsgs);
+            setTimeout(() => {
+                let reply = '';
+                if(text.includes('手里') || text.includes('握着')) reply = '好问题！考古学家们争论了很久。我的双手环握成圆形，中间有明显的空隙。几种主流猜测：象牙（三星堆出土了大量象牙）、金杖（象征权力的权杖）、或是某种祭祀法器。你觉得呢？';
+                else reply = '我是距今3000多年的神秘古蜀祭司，或许代表权力与信仰。您可以通过“更多”查看学者观点。';
+                setMessages([...newMsgs, { role:'assistant', content:reply }]);
+            }, 800);
+        };
+        return (
+            <div className="min-h-screen bg-black flex flex-col">
+                <div className="p-4 border-b border-white/10 flex items-center gap-3"><button onClick={()=>setCurrentPage('detail')}>←</button><span className="font-bold">正在对话：青铜立人像</span><span className="ml-auto text-xs liquid-glass px-2 py-1 rounded-full">通俗模式</span></div>
+                <div className="flex-1 p-4 overflow-auto space-y-3">
+                    {messages.map((m,i)=>(
+                        <div key={i} className={`flex ${m.role==='user'?'justify-end':'justify-start'}`}><div className={`max-w-[75%] p-3 rounded-2xl ${m.role==='user'?'bg-amber-700/50':'bg-white/10'}`}>{m.content}</div></div>
+                    ))}
+                </div>
+                <div className="p-3 bg-black/80 border-t border-white/10 flex gap-2"><input className="flex-1 bg-white/10 rounded-full px-4 py-2 text-sm" placeholder="问我吧..." value={input} onChange={e=>setInput(e.target.value)} onKeyPress={e=>e.key==='Enter' && sendMsg(input)}/><button onClick={()=>sendMsg(input)} className="bg-amber-600 px-4 rounded-full">发送</button></div>
+            </div>
+        );
+    };
+    // AR 体验骨架
+    const ARPage = () => (<div className="min-h-screen bg-black flex flex-col items-center justify-center"><p className="text-white text-xl mb-4">🥽 AR增强现实演示</p><div className="w-4/5 h-64 bg-gradient-to-tr from-blue-900 to-purple-800 rounded-2xl flex items-center justify-center"><div className="text-center"><div className="text-6xl"></div><p className="text-white/80">青铜立人像已放置在桌面</p><button className="mt-4 liquid-glass px-4 py-1 rounded-full">拍照分享</button></div></div></div>);
+    // 收藏页面虚拟
+    const CollectionPage = () => (<div className="min-h-screen p-5 text-white"><h1 className="text-3xl font-heading italic">我的宝库</h1><div className="flex gap-4 my-4"><div className="liquid-glass-strong px-4 py-2 rounded-full">已收藏24件文物</div><div className="liquid-glass-strong px-4 py-2 rounded-full">已学习58分钟</div></div><div className="space-y-3"><div className="bg-white/5 p-3 rounded-xl flex justify-between"><span>青铜立人像 · 收藏2天前</span><span>320人共同收藏</span></div><div className="bg-white/5 p-3 rounded-xl">太阳神鸟 · 收藏5天前</div><div className="bg-white/5 p-3 rounded-xl">说唱俑 · 收藏1周前</div></div><div className="mt-6"><h3>成就墙</h3><div className="grid grid-cols-2 gap-2 mt-2"><div> 初识文博 ✅</div><div>️ 对话达人 45/50</div><div>🥽 AR探险家 2/5</div></div></div></div>);
+    // 学校教师专区
+    const TeacherZone = () => (<div className="min-h-screen p-5 text-white"><h2 className="text-2xl font-heading italic">教师工作台 · 李老师，下午好</h2><div className="grid gap-4 mt-5"><div className="liquid-glass p-4 rounded-2xl"> 我的班级 · 五年级2班</div><div className="liquid-glass p-4 rounded-2xl">🛠️ 课堂工具 · AR课件/AI讲解员</div><div className="liquid-glass p-4 rounded-2xl"> 教学资源库： “三星堆与古蜀文明” 下载1200+</div><button className="bg-amber-700/40 px-4 py-2 rounded-full mt-2">✨ 申请公益计划“数字文博课堂”</button></div></div>);
+    // 主应用路由
+    const App = () => {
+        const [showSplash, setShowSplash] = useState(true);
+        const [currentPage, setCurrentPage] = useState('home');
+        const [selectedArtifact, setSelectedArtifact] = useState(null);
+        if(showSplash) return <SplashScreen onFinish={()=>setShowSplash(false)} />;
+        const pageMap = {
+            home: <HomePage setCurrentPage={setCurrentPage} setSelectedArtifact={setSelectedArtifact} />,
+            scan: <ScanPage setCurrentPage={setCurrentPage} setSelectedArtifact={setSelectedArtifact} />,
+            detail: <ArtifactDetail artifact={selectedArtifact} setCurrentPage={setCurrentPage} />,
+            chat: <ChatPage artifact={selectedArtifact} setCurrentPage={setCurrentPage} />,
+            ar: <ARPage />,
+            collection: <CollectionPage />,
+            teacher: <TeacherZone />
+        };
+        return (
+            <div className="relative">
+                {pageMap[currentPage]}
+                {/* 简易悬浮教师入口 */}
+                {currentPage !== 'teacher' && <button onClick={()=>setCurrentPage('teacher')} className="fixed bottom-20 right-4 bg-amber-700/80 text-white rounded-full p-3 shadow-lg text-xs">‍ 教师专区</button>}
+            </div>
+        );
+    };
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
+
