@@ -5,12 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>文物叙事者 · AI多模态文化遗产活化平台</title>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
-    <script src="https://unpkg.com/framer-motion@11.11.17/dist/framer-motion.js"></script>
+    <!-- 国内更稳定的CDN镜像 -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/babel-standalone/6.26.0/babel.min.js"></script>
+    <!-- Framer Motion 使用轻量替代 -->
+    <script src="https://cdn.jsdelivr.net/npm/framer-motion@11.11.17/dist/framer-motion.js"></script>
     <script>window.Motion = window.FramerMotion;</script>
+    <!-- Tailwind CSS CDN 稳定版 -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; overflow-x: hidden; font-family: 'Barlow', sans-serif; }
@@ -79,45 +83,29 @@
 <div id="root"></div>
 
 <script type="text/babel">
-    const { motion, AnimatePresence } = window.Motion;
+    const { motion } = window.Motion || { motion: (props) => React.createElement('div', props) };
     const { useState, useEffect, useRef, useCallback } = React;
     
-    const BlurText = ({ text, className = "", delayBase = 0, once = true }) => {
-        const [hasAnimated, setHasAnimated] = useState(false);
+    // 简单实现动画组件 fallback
+    const MotionDiv = ({ children, initial, animate, transition, className }) => {
+        return React.createElement('div', { className, style: { ...(animate || {}) } }, children);
+    };
+    const motionDiv = MotionDiv;
+    
+    const BlurText = ({ text, className = "" }) => {
+        const [visible, setVisible] = useState(false);
         const ref = useRef(null);
         useEffect(() => {
             const observer = new IntersectionObserver(([entry]) => {
-                if (entry.isIntersecting && !hasAnimated) {
-                    setHasAnimated(true);
-                    observer.disconnect();
-                }
+                if (entry.isIntersecting) setVisible(true);
             }, { threshold: 0.1 });
             if (ref.current) observer.observe(ref.current);
             return () => observer.disconnect();
-        }, [hasAnimated]);
-        const words = text.split(' ');
+        }, []);
         return (
             <p ref={ref} className={`flex flex-wrap justify-center gap-x-[0.28em] ${className}`}>
-                {words.map((word, i) => (
-                    <motion.span
-                        key={i}
-                        initial={hasAnimated ? false : { filter: 'blur(10px)', opacity: 0, y: 50 }}
-                        animate={hasAnimated ? { filter: 'blur(0px)', opacity: 1, y: 0 } : {}}
-                        transition={{
-                            duration: 0.7,
-                            delay: delayBase + (i * 0.1),
-                            ease: "easeOut",
-                            times: [0, 0.5, 1],
-                            keyframes: hasAnimated ? undefined : [
-                                { filter: 'blur(10px)', opacity: 0, y: 50 },
-                                { filter: 'blur(5px)', opacity: 0.5, y: -5 },
-                                { filter: 'blur(0px)', opacity: 1, y: 0 }
-                            ]
-                        }}
-                        style={{ display: 'inline-block', marginRight: '0.28em' }}
-                    >
-                        {word}
-                    </motion.span>
+                {text.split(' ').map((word, i) => (
+                    <span key={i} style={{ display: 'inline-block', marginRight: '0.28em', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(20px)', transition: `all 0.4s ease ${i * 0.05}s` }}>{word}</span>
                 ))}
             </p>
         );
@@ -133,11 +121,11 @@
         }, []);
         return (
             <div className="fixed inset-0 z-[200] bg-gradient-to-br from-[#0a1f2e] via-[#0e2a2a] to-[#0a2e1f] pattern-bg flex flex-col items-center justify-center">
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.6 }} className="text-center">
+                <div className="text-center">
                     <h1 className="font-heading italic text-white text-6xl md:text-7xl tracking-tight" style={{fontFamily: "'Instrument Serif', serif"}}>文物叙事者</h1>
                     <p className="text-white/70 text-lg mt-2 font-body">Heritage Narrator</p>
                     <p className="text-white/40 text-sm mt-4 italic">让每一件文物都会说话</p>
-                </motion.div>
+                </div>
                 <div className="w-64 mt-16 bg-white/20 rounded-full h-1 overflow-hidden">
                     <div className="h-full bg-amber-400 rounded-full" style={{ width: `${progress}%` }}></div>
                 </div>
@@ -154,8 +142,8 @@
         ];
         const recommends = [
             { name: "三星堆青铜面具", viewers: "2893人最近看过", desc: "商代，用于祭祀仪式，纵目夸张" },
-            { name: "东汉击鼓说唱陶俑", viewers: "1567人最近看过", desc: "汉代俳优，国家一级文物，神态诙谐" },
-            { name: "金沙太阳神鸟", viewers: "3421人最近看过", desc: "成都城市标志原型，金饰含太阳与神鸟" }
+            { name: "东汉击鼓说唱陶俑", viewers: "1567人最近看过", desc: "汉代俳优，国家一级文物" },
+            { name: "金沙太阳神鸟", viewers: "3421人最近看过", desc: "成都城市标志原型" }
         ];
         return (
             <div className="min-h-screen bg-black text-white pb-20">
@@ -178,7 +166,7 @@
                     {[
                         { icon:"📷", label:"拍照识别", action:()=>setCurrentPage('scan') },
                         { icon:"🥽", label:"文物到家", action:()=>setCurrentPage('ar') },
-                        { icon:"💬", label:"问问文物", action:()=>{ setSelectedArtifact({ name:'青铜立人像', era:'商代', museum:'三星堆博物馆', desc:'我是青铜立人，问我吧！', story:'我是距今约3000多年的青铜立人像，出土于三星堆祭祀坑。关于我的身份，学界有多种说法：有人说是古蜀国的大祭司，也有人说是国王。你看我双手环握的姿势——曾经我手里握着什么呢？可能是象牙、金杖，或是某种法器。你想问我什么？点击【试试问我】' }); setCurrentPage('chat'); } },
+                        { icon:"💬", label:"问问文物", action:()=>{ setSelectedArtifact({ name:'青铜立人像', era:'商代', museum:'三星堆博物馆', story:'我是距今约3000多年的青铜立人像...' }); setCurrentPage('chat'); } },
                         { icon:"⭐", label:"我的宝库", action:()=>setCurrentPage('collection') }
                     ].map((f,i)=>(
                         <button key={i} onClick={f.action} className="flex flex-col items-center gap-1">
@@ -207,10 +195,6 @@
     
     const ScanPage = ({ setCurrentPage, setSelectedArtifact }) => {
         const [scanning, setScanning] = useState(true);
-        const handleSuccess = () => {
-            setScanning(false);
-            setSelectedArtifact({ name:'青铜立人像', era:'商代', museum:'三星堆博物馆', height:'260.8cm', material:'青铜', year:'1986年出土', level:'国家一级文物', story:'我是距今约3000多年的青铜立人像，出土于三星堆祭祀坑。关于我的身份，学界有多种说法：有人说是古蜀国的大祭司，也有人说是国王。你看我双手环握的姿势——曾经我手里握着什么呢？可能是象牙、金杖，或是某种法器。你想问我什么？点击【试试问我】' });
-        };
         return (
             <div className="min-h-screen bg-black relative">
                 <div className="absolute inset-0 bg-[url('https://picsum.photos/id/104/800/1200')] bg-cover opacity-20"></div>
@@ -222,7 +206,7 @@
                         </div>
                     </div>
                     <p className="text-center text-white mt-8">将文物对准取景框</p>
-                    {scanning && <button onClick={handleSuccess} className="mx-auto block mt-10 liquid-glass-strong px-6 py-2 rounded-full">模拟识别成功</button>}
+                    {scanning && <button onClick={()=>{ setScanning(false); setSelectedArtifact({ name:'青铜立人像' }); }} className="mx-auto block mt-10 liquid-glass-strong px-6 py-2 rounded-full">模拟识别成功</button>}
                     {!scanning && (<div className="mt-8 bg-black/70 p-4 rounded-2xl text-center"><p className="text-green-400">识别成功！青铜立人像 · 相似度98%</p><div className="flex gap-4 justify-center mt-3"><button onClick={()=>{ setCurrentPage('detail'); }} className="bg-white/20 px-4 py-1 rounded-full">查看详情</button><button onClick={()=>{ setCurrentPage('chat'); }} className="bg-amber-600 px-4 py-1 rounded-full">和它对话</button></div></div>)}
                 </div>
             </div>
@@ -230,16 +214,16 @@
     };
     
     const ArtifactDetail = ({ artifact, setCurrentPage }) => {
-        if(!artifact) artifact = { name:'青铜立人像', era:'商代', museum:'三星堆博物馆', height:'260.8cm', material:'青铜', year:'1986年出土', level:'国家一级文物', story:'我是距今约3000多年的青铜立人像...' };
+        const data = artifact || { name:'青铜立人像', era:'商代', museum:'三星堆博物馆', height:'260.8cm', material:'青铜', year:'1986年出土', level:'国家一级文物', story:'我是距今约3000多年的青铜立人像...' };
         return (
             <div className="min-h-screen bg-black text-white pb-20">
                 <div className="relative h-64 bg-gradient-to-b from-amber-900/40 to-black flex items-center justify-center"><p className="text-4xl">🏺 文物图片</p></div>
                 <div className="px-5 -mt-6 relative z-10">
-                    <h1 className="text-3xl font-heading italic" style={{fontFamily: "'Instrument Serif', serif"}}>{artifact.name} · {artifact.era}</h1>
-                    <p className="text-white/60 text-sm">{artifact.museum}</p>
-                    <div className="flex flex-wrap gap-3 my-4 bg-white/5 p-3 rounded-xl"><span>📏 {artifact.height}</span><span>⚱️ {artifact.material}</span><span>📅 {artifact.year}</span><span>🏆 {artifact.level}</span></div>
+                    <h1 className="text-3xl font-heading italic" style={{fontFamily: "'Instrument Serif', serif"}}>{data.name} · {data.era}</h1>
+                    <p className="text-white/60 text-sm">{data.museum}</p>
+                    <div className="flex flex-wrap gap-3 my-4 bg-white/5 p-3 rounded-xl"><span>📏 {data.height}</span><span>⚱️ {data.material}</span><span>📅 {data.year}</span><span>🏆 {data.level}</span></div>
                     <div className="flex gap-3 my-3"><button className="liquid-glass-strong px-4 py-2 rounded-full text-sm">🎧 AI语音导览</button><button className="liquid-glass-strong px-4 py-2 rounded-full text-sm">🥽 AR体验</button><button className="liquid-glass-strong px-4 py-2 rounded-full text-sm" onClick={()=>setCurrentPage('chat')}>💬 AI问答</button></div>
-                    <div className="bg-white/5 rounded-2xl p-4 mt-2"><p className="text-sm leading-relaxed">{artifact.story}</p><button onClick={()=>setCurrentPage('chat')} className="mt-3 text-amber-400 text-sm">试试问我 →</button></div>
+                    <div className="bg-white/5 rounded-2xl p-4 mt-2"><p className="text-sm leading-relaxed">{data.story}</p><button onClick={()=>setCurrentPage('chat')} className="mt-3 text-amber-400 text-sm">试试问我 →</button></div>
                 </div>
             </div>
         );
@@ -253,11 +237,9 @@
             const newMsgs = [...messages, { role:'user', content:text }];
             setMessages(newMsgs);
             setTimeout(() => {
-                let reply = '';
-                if(text.includes('手里') || text.includes('握着')) reply = '好问题！考古学家们争论了很久。我的双手环握成圆形，中间有明显的空隙。几种主流猜测：象牙（三星堆出土了大量象牙）、金杖（象征权力的权杖）、或是某种祭祀法器。你觉得呢？点击【查看更多】可以看学者们的详细观点。';
-                else reply = '我是距今3000多年的神秘古蜀祭司，或许代表权力与信仰。您可以通过“更多”查看学者观点。';
+                let reply = text.includes('手里') ? '好问题！考古学家们争论了很久。我的双手环握成圆形，可能是象牙、金杖或是某种法器。' : '我是古蜀文明的祭司，你可以问我更多历史问题。';
                 setMessages([...newMsgs, { role:'assistant', content:reply }]);
-            }, 800);
+            }, 500);
         };
         return (
             <div className="min-h-screen bg-black flex flex-col">
@@ -283,18 +265,11 @@
         const [currentPage, setCurrentPage] = useState('home');
         const [selectedArtifact, setSelectedArtifact] = useState(null);
         if(showSplash) return <SplashScreen onFinish={()=>setShowSplash(false)} />;
-        const pageMap = {
-            home: <HomePage setCurrentPage={setCurrentPage} setSelectedArtifact={setSelectedArtifact} />,
-            scan: <ScanPage setCurrentPage={setCurrentPage} setSelectedArtifact={setSelectedArtifact} />,
-            detail: <ArtifactDetail artifact={selectedArtifact} setCurrentPage={setCurrentPage} />,
-            chat: <ChatPage artifact={selectedArtifact} setCurrentPage={setCurrentPage} />,
-            ar: <ARPage />,
-            collection: <CollectionPage />,
-            teacher: <TeacherZone />
-        };
+        const pages = { home: HomePage, scan: ScanPage, detail: ArtifactDetail, chat: ChatPage, ar: ARPage, collection: CollectionPage, teacher: TeacherZone };
+        const PageComponent = pages[currentPage];
         return (
-            <div className="relative">
-                {pageMap[currentPage]}
+            <div>
+                <PageComponent setCurrentPage={setCurrentPage} setSelectedArtifact={setSelectedArtifact} artifact={selectedArtifact} />
                 {currentPage !== 'teacher' && <button onClick={()=>setCurrentPage('teacher')} className="fixed bottom-20 right-4 bg-amber-700/80 text-white rounded-full p-3 shadow-lg text-xs">👩‍🏫 教师专区</button>}
             </div>
         );
